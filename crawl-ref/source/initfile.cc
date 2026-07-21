@@ -659,10 +659,13 @@ const vector<GameOption*> game_options::build_options_list()
         new IntGameOption(magic_point_warning, {"mp_warning"}, 0, 0, 100),
         new IntGameOption(SIMPLE_NAME(autofight_warning), 0, 0, 1000),
         // These need to be odd, hence allow +1.
+        // Fork defaults: a larger game field. The map is the focus, so it is
+        // given a generous size; the layout also lets it fill any space the
+        // (capped) sidebar leaves, up to GXM/GYM.
         new IntGameOption(SIMPLE_NAME(view_max_width),
-                      max(VIEW_BASE_WIDTH, VIEW_MIN_WIDTH),
+                      max(55, VIEW_MIN_WIDTH),
                       VIEW_MIN_WIDTH, GXM + 1),
-        new IntGameOption(SIMPLE_NAME(view_max_height), max(21, VIEW_MIN_HEIGHT),
+        new IntGameOption(SIMPLE_NAME(view_max_height), max(45, VIEW_MIN_HEIGHT),
                       VIEW_MIN_HEIGHT, GYM + 1),
         new IntGameOption(SIMPLE_NAME(mlist_min_height), 4, 0),
         new IntGameOption(SIMPLE_NAME(msg_min_height), max(7, MSG_MIN_HEIGHT),

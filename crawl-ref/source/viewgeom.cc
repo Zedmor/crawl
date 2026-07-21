@@ -25,6 +25,10 @@
 #define MLIST_MIN_HEIGHT Options.mlist_min_height
 #define MLIST_MIN_WIDTH 25  // non-inline layout only
 #define MLIST_MAX_WIDTH 42
+// The panel sidebar is capped so it never hogs a wide terminal; any width it
+// leaves goes to the map, which is the focus. Two columns need ~42 (left) + 1
+// (gutter) + ~45 (right).
+#define SIDEBAR_MAX_WIDTH 90
 #define MLIST_GUTTER 1
 #define HUD_MIN_GUTTER 2
 #define HUD_MAX_GUTTER 4
@@ -112,7 +116,12 @@ public:
         mlistsz.x = hudsz.x;
         _increment(mlistsz.x,  leftover_x(), MLIST_MAX_WIDTH);
         _increment(hud_gutter, leftover_x(), HUD_MAX_GUTTER);
-        _increment(mlistsz.x,  leftover_x(), INT_MAX);
+        // Cap the sidebar (was unbounded, which let it eat the whole terminal),
+        // then hand any remaining width to the map so it stays the focus.
+        _increment(mlistsz.x,  leftover_x(), SIDEBAR_MAX_WIDTH);
+        _increment(viewsz.x,   leftover_x(), GXM);
+        if ((viewsz.x % 2) != 1)
+            --viewsz.x;
         msgsz.x = termsz.x;
 
         // y: View gets as much as it wants.
@@ -129,6 +138,12 @@ public:
         if (mlistsz.y < MLIST_MIN_HEIGHT)
             _increment(mlistsz.y, leftover_rightcol_y(), MLIST_MIN_HEIGHT);
         _increment(msgsz.y,  leftover_y(), MSG_MAX_HEIGHT);
+        // Let the map fill the space beneath it (down to the message pane), so
+        // tall terminals spend that room on the game field instead of leaving
+        // it blank. The sidebar then fills the right column independently.
+        _increment(viewsz.y, leftover_leftcol_y(), GYM);
+        if ((viewsz.y % 2) != 1)
+            --viewsz.y;
         _increment(mlistsz.y, leftover_rightcol_y(), INT_MAX);
 
         // Finish off by doing the positions.
