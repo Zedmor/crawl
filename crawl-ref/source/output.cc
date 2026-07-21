@@ -16,9 +16,11 @@
 #include "areas.h"
 #include "branch.h"
 #include "colour.h"
+#include "ability.h"
 #include "database.h"
 #include "describe.h"
 #include "mon-util.h"
+#include "skills.h"
 #ifndef USE_TILE_LOCAL
 #endif
 #include "english.h"
@@ -2372,6 +2374,153 @@ int update_monster_info_pane()
 {
     return false;
 }
+#endif
+
+// Runtime show/hide toggle for the sidebar panels (Ctrl-V). Defined outside the
+// console guard so the command dispatch links in every build.
+static bool _ui_panels_hidden = false;
+bool ui_panels_hidden() { return _ui_panels_hidden; }
+void toggle_ui_panels() { _ui_panels_hidden = !_ui_panels_hidden; }
+
+#ifndef USE_TILE_LOCAL
+// Always-on abilities panel: the same talents as the 'a' menu, with hotkeys and
+// failure rates.
+int update_abilities_pane()
+{
+    if (crawl_view.abilsz.y <= 0 || crawl_view.abilsz.x <= 0)
+        return -1;
+    if (!map_bounds(you.pos()) && !crawl_state.game_is_arena())
+        return -1;
+
+    const int width  = crawl_view.abilsz.x;
+    const int height = crawl_view.abilsz.y;
+    save_cursor_pos save;
+    textbackground(BLACK);
+    const string blank(width, ' ');
+
+    CGOTOXY(1, 1, GOTO_ABIL);
+    textcolour(BLUE);
+    {
+        string label = "─ Abilities ";
+        while (strwidth(label) < width)
+            label += "─";
+        CPRINTF("%s", chop_string(label, width).c_str());
+    }
+
+    vector<talent> talents = your_talents(false);
+    struct dline { int colour; string text; };
+    vector<dline> lines;
+    if (talents.empty())
+        lines.push_back({DARKGREY, "None available."});
+    else
+        for (const talent &t : talents)
+        {
+            const char letter = t.hotkey ? (char) t.hotkey : '-';
+            string s = make_stringf("%c) %s", letter,
+                                    ability_name(t.which).c_str());
+            if (t.fail > 0)
+                s += make_stringf(" (%d%%)", t.fail);
+            lines.push_back({LIGHTGREY, s});
+        }
+
+    const int body_lines = height - 1;
+    const bool overflow = (int) lines.size() > body_lines;
+    const int shown = overflow ? body_lines - 1 : (int) lines.size();
+    for (int i = 0; i < body_lines; ++i)
+    {
+        CGOTOXY(1, 2 + i, GOTO_ABIL);
+        if (i < shown)
+        {
+            textcolour(lines[i].colour);
+            CPRINTF("%s", chop_string(lines[i].text, width).c_str());
+        }
+        else if (overflow && i == body_lines - 1)
+        {
+            textcolour(BROWN);
+            CPRINTF("%s", chop_string(make_stringf("(… %d more)",
+                          (int) lines.size() - shown), width).c_str());
+        }
+        else
+        {
+            textcolour(LIGHTGREY);
+            CPRINTF("%s", blank.c_str());
+        }
+    }
+    textcolour(LIGHTGREY);
+    return talents.size();
+}
+
+// Always-on skills panel: trained skills with their levels; actively-trained
+// skills are highlighted.
+int update_skills_pane()
+{
+    if (crawl_view.skillsz.y <= 0 || crawl_view.skillsz.x <= 0)
+        return -1;
+    if (!map_bounds(you.pos()) && !crawl_state.game_is_arena())
+        return -1;
+
+    const int width  = crawl_view.skillsz.x;
+    const int height = crawl_view.skillsz.y;
+    save_cursor_pos save;
+    textbackground(BLACK);
+    const string blank(width, ' ');
+
+    CGOTOXY(1, 1, GOTO_SKILL);
+    textcolour(BLUE);
+    {
+        string label = "─ Skills ";
+        while (strwidth(label) < width)
+            label += "─";
+        CPRINTF("%s", chop_string(label, width).c_str());
+    }
+
+    struct dline { int colour; string text; };
+    vector<dline> lines;
+    for (int i = 0; i < NUM_SKILLS; ++i)
+    {
+        const skill_type sk = static_cast<skill_type>(i);
+        if (is_useless_skill(sk))
+            continue;
+        const int lvl = you.skill(sk, 10);   // level * 10
+        if (lvl <= 0)
+            continue;
+        const bool training = you.training[sk] > 0;
+        lines.push_back({training ? LIGHTGREEN : LIGHTGREY,
+                         make_stringf("%-13.13s %2d.%d", skill_name(sk),
+                                      lvl / 10, lvl % 10)});
+    }
+    if (lines.empty())
+        lines.push_back({DARKGREY, "No skills trained."});
+
+    const int body_lines = height - 1;
+    const bool overflow = (int) lines.size() > body_lines;
+    const int shown = overflow ? body_lines - 1 : (int) lines.size();
+    for (int i = 0; i < body_lines; ++i)
+    {
+        CGOTOXY(1, 2 + i, GOTO_SKILL);
+        if (i < shown)
+        {
+            textcolour(lines[i].colour);
+            CPRINTF("%s", chop_string(lines[i].text, width).c_str());
+        }
+        else if (overflow && i == body_lines - 1)
+        {
+            textcolour(BROWN);
+            CPRINTF("%s", chop_string(make_stringf("(… %d more)",
+                          (int) lines.size() - shown), width).c_str());
+        }
+        else
+        {
+            textcolour(LIGHTGREY);
+            CPRINTF("%s", blank.c_str());
+        }
+    }
+    textcolour(LIGHTGREY);
+    return lines.size();
+}
+#else
+int update_abilities_pane() { return false; }
+int update_skills_pane()    { return false; }
 #endif
 
 int equip_slot_by_name(const char *s)

@@ -2305,6 +2305,13 @@ void process_command(command_type cmd, command_type prev_cmd)
         update_screen();
         break;
     case CMD_DISPLAY_INVENTORY:        display_inventory();            break;
+    case CMD_TOGGLE_UI_PANELS:
+        toggle_ui_panels();
+        crawl_view.init_geometry();
+        redraw_screen();
+        update_screen();
+        mprf("Sidebar panels %s.", ui_panels_hidden() ? "hidden" : "shown");
+        break;
     case CMD_DISPLAY_KNOWN_OBJECTS:
         check_item_knowledge();
         redraw_screen();

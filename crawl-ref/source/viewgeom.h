@@ -64,6 +64,10 @@ public:
     coord_def invsz;               // Size of the inventory panel.
     coord_def minfp;               // Left-top pos of the monster info panel.
     coord_def minfsz;              // Size of the monster info panel.
+    coord_def abilp;               // Left-top pos of the abilities panel.
+    coord_def abilsz;              // Size of the abilities panel.
+    coord_def skillp;              // Left-top pos of the skills panel.
+    coord_def skillsz;             // Size of the skills panel.
 
     coord_def vgrdc;               // What grid pos is at the centre of the view
                                    // usually you.pos().

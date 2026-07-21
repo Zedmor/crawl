@@ -698,6 +698,8 @@ void viewwindow(bool show_updates, bool tiles_only, animation *a, view_renderer 
                 puttext(crawl_view.viewp.x, crawl_view.viewp.y, vbuf);
                 update_monster_pane();
                 update_monster_info_pane();
+                update_abilities_pane();
+                update_skills_pane();
                 update_inventory_pane();
             }
 #else

@@ -476,6 +476,8 @@ public:
     bool        mlist_allow_alternate_layout;
     bool        show_inventory_panel;
     bool        show_monster_info_panel;
+    bool        show_abilities_panel;
+    bool        show_skills_panel;
     bool        monster_item_view_coordinates;
     vector<text_pattern> monster_item_view_features;
     bool        messages_at_top;

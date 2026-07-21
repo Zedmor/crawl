@@ -31,6 +31,10 @@ string mpr_monster_list(bool past = false);
 int update_monster_pane();
 int update_inventory_pane();
 int update_monster_info_pane();
+int update_abilities_pane();
+int update_skills_pane();
+bool ui_panels_hidden();
+void toggle_ui_panels();
 
 int equip_slot_by_name(const char *s);
 

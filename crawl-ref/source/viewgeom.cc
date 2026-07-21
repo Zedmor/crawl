@@ -5,6 +5,7 @@
 #include "dungeon.h"
 #include "end.h"
 #include "options.h"
+#include "output.h"
 #include "state.h"
 #include "tiles-build-specific.h"
 
@@ -425,46 +426,79 @@ void crawl_view_geometry::init_geometry()
     // panel (more of the pack visible at once), while small terminals keep the
     // classic layout untouched (graceful degradation). Items past the panel's
     // height are summarised with a (…) marker, exactly like the monster list.
-    invp   = coord_def(0, 0);
-    invsz  = coord_def(0, 0);
-    minfp  = coord_def(0, 0);
-    minfsz = coord_def(0, 0);
+    invp    = coord_def(0, 0);
+    invsz   = coord_def(0, 0);
+    minfp   = coord_def(0, 0);
+    minfsz  = coord_def(0, 0);
+    abilp   = coord_def(0, 0);
+    abilsz  = coord_def(0, 0);
+    skillp  = coord_def(0, 0);
+    skillsz = coord_def(0, 0);
 #ifndef USE_TILE_LOCAL
     // Only the default (inline) layout stacks the monster list directly below
     // the HUD, which is the space these sidebar panels are carved from. The
-    // right column becomes a stack: Monsters list / Monster inspector /
-    // Inventory. Larger terminals fit more of the stack; small ones fall back.
-    if (Options.show_inventory_panel && winner == &lay_inline)
+    // right column becomes a stack (Monsters list / Monster inspector /
+    // Abilities / Skills / Inventory); optional panels are added in priority
+    // order as vertical room allows, so larger terminals surface more of them.
+    // Small terminals — and the Ctrl-V toggle — fall back to the classic view.
+    if (Options.show_inventory_panel && !ui_panels_hidden() && winner == &lay_inline)
     {
         const int mheader       = 1;   // "Monsters" title rule above the list
         const int avail         = mlistsz.y - mheader;
         const int mlist_reserve = 5;   // rows kept for the monster list body
         const int inv_min       = 6;
         const int inv_max       = 54;  // 52 slots + header + overflow line
-        const int minfo_want    = 12;  // monster inspector incl. its own header
+        const int minfo_want    = 12;  // each optional panel incl. its header
+        const int abil_want     = 8;
+        const int skill_want    = 8;
         if (avail >= mlist_reserve + inv_min)
         {
-            // The inspector only appears when there's ample room, so it shows
-            // up on larger terminals without starving the other panels.
-            int minfo_h = 0;
-            if (Options.show_monster_info_panel
-                && avail >= mlist_reserve + minfo_want + inv_min)
+            int budget = avail - mlist_reserve - inv_min; // rows beyond essentials
+            int minfo_h = 0, abil_h = 0, skill_h = 0;
+            if (Options.show_monster_info_panel && budget >= minfo_want)
             {
                 minfo_h = minfo_want;
+                budget -= minfo_want;
             }
-            int inv_h = min(avail - mlist_reserve - minfo_h, inv_max);
-            inv_h = max(inv_h, inv_min);
-            const int mlist_h = avail - minfo_h - inv_h;
+            if (Options.show_abilities_panel && budget >= abil_want)
+            {
+                abil_h = abil_want;
+                budget -= abil_want;
+            }
+            if (Options.show_skills_panel && budget >= skill_want)
+            {
+                skill_h = skill_want;
+                budget -= skill_want;
+            }
 
-            mlistp.y  += mheader;       // list starts below its title rule
-            mlistsz.y  = mlist_h;
+            const int optional = minfo_h + abil_h + skill_h;
+            int inv_h = min(avail - mlist_reserve - optional, inv_max);
+            inv_h = max(inv_h, inv_min);
+            const int mlist_h = avail - optional - inv_h;
+
+            mlistp.y += mheader;        // list starts below its title rule
+            mlistsz.y = mlist_h;
+            int y = mlistp.y + mlist_h; // running top of the next panel
             if (minfo_h > 0)
             {
+                minfp  = coord_def(mlistp.x, y);
                 minfsz = coord_def(mlistsz.x, minfo_h);
-                minfp  = coord_def(mlistp.x, mlistp.y + mlist_h);
+                y += minfo_h;
             }
+            if (abil_h > 0)
+            {
+                abilp  = coord_def(mlistp.x, y);
+                abilsz = coord_def(mlistsz.x, abil_h);
+                y += abil_h;
+            }
+            if (skill_h > 0)
+            {
+                skillp  = coord_def(mlistp.x, y);
+                skillsz = coord_def(mlistsz.x, skill_h);
+                y += skill_h;
+            }
+            invp  = coord_def(mlistp.x, y);
             invsz = coord_def(mlistsz.x, inv_h);
-            invp  = coord_def(mlistp.x, mlistp.y + mlist_h + minfo_h);
         }
     }
 #endif
