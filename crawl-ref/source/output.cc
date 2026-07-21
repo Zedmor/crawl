@@ -2542,13 +2542,18 @@ int update_skills_pane()
     sort(others.begin(), others.end(),
          [](const srow &a, const srow &b) { return a.lvl > b.lvl; });
 
+    // Name field grows with the panel but is capped (skill names are short) so
+    // the level/% columns stay next to the names on wide panels.
+    const int name_w = min(18, max(8, width - 9));
     for (const srow &r : trained)
         lines.push_back({LIGHTGREEN,
-                         make_stringf("%-12.12s %2d.%d %2u%%", skill_name(r.sk),
+                         make_stringf("%-*.*s %2d.%d %2u%%", name_w, name_w,
+                                      skill_name(r.sk),
                                       r.lvl / 10, r.lvl % 10, r.pct)});
     for (const srow &r : others)
         lines.push_back({LIGHTGREY,
-                         make_stringf("%-12.12s %2d.%d", skill_name(r.sk),
+                         make_stringf("%-*.*s %2d.%d", name_w, name_w,
+                                      skill_name(r.sk),
                                       r.lvl / 10, r.lvl % 10)});
     if (lines.empty())
         lines.push_back({DARKGREY, "No skills trained."});
@@ -2609,6 +2614,10 @@ int update_spells_pane()
     struct dline { int colour; string text; };
     vector<dline> lines;
 
+    // Name field grows with the panel but is capped so the fail%/level columns
+    // stay next to the names instead of drifting to the far edge on wide panels.
+    const int name_w = min(28, max(8, width - 11));
+
     // Memorised (castable) spells, with their cast letter.
     for (const spell_type spell : you.spells)
     {
@@ -2617,8 +2626,9 @@ int update_spells_pane()
         const int letter = get_spell_letter(spell);
         const int fail = failure_rate_to_int(raw_spell_fail(spell));
         lines.push_back({LIGHTGREY,
-            make_stringf("%c) %-16.16s %2d%% L%d",
+            make_stringf("%c) %-*.*s %2d%% L%d",
                          letter > 0 ? (char) letter : '-',
+                         name_w, name_w,
                          spell_title(spell), fail, spell_difficulty(spell))});
     }
 
@@ -2649,8 +2659,8 @@ int update_spells_pane()
                                && lvl <= player_spell_levels();
             const int fail = failure_rate_to_int(raw_spell_fail(sp));
             lines.push_back({ready ? LIGHTGREY : DARKGREY,
-                make_stringf("  %-16.16s %2d%% L%d",
-                             spell_title(sp), fail, lvl)});
+                make_stringf("  %-*.*s %2d%% L%d",
+                             name_w, name_w, spell_title(sp), fail, lvl)});
         }
     }
 
