@@ -458,23 +458,32 @@ void crawl_view_geometry::init_geometry()
 
         if (two_col)
         {
-            // Right column beside the stats: Abilities on top, Skills below.
+            // Right column beside the stats: Monster inspector on top (prime
+            // combat real-estate and guaranteed room here, since this column
+            // uses the full height), then Abilities, Skills, Spells. The
+            // enabled panels split the height evenly; the last gets the
+            // remainder so the column reaches the message pane.
             const int right_x = hudp.x + left_w + gutter;
             const int right_w = sidebar_w - left_w - gutter;
             const int top     = hudp.y;
-            const int right_h = msgp.y - top;   // full sidebar height
-            // Stack the enabled right-column panels (Abilities, then Skills,
-            // then Spells) and split the height between them; the last one
-            // gets the remainder so the column reaches the message pane.
+            const int right_h = msgp.y - top;
+            const bool wi  = Options.show_monster_info_panel;
             const bool wa  = Options.show_abilities_panel;
             const bool ws  = Options.show_skills_panel;
             const bool wsp = Options.show_spells_panel;
-            int n = (wa ? 1 : 0) + (ws ? 1 : 0) + (wsp ? 1 : 0);
+            int n = (wi ? 1 : 0) + (wa ? 1 : 0) + (ws ? 1 : 0) + (wsp ? 1 : 0);
             if (n > 0 && right_h >= 2)
             {
                 const int each = right_h / n;
                 int ry = top;
                 int remaining = n;
+                if (wi)
+                {
+                    const int h = (remaining == 1) ? (msgp.y - ry) : each;
+                    minfp = coord_def(right_x, ry);
+                    minfsz = coord_def(right_w, h);
+                    ry += h; --remaining;
+                }
                 if (wa)
                 {
                     const int h = (remaining == 1) ? (msgp.y - ry) : each;
@@ -498,30 +507,18 @@ void crawl_view_geometry::init_geometry()
                 }
             }
 
-            // Left column below the HUD, narrowed to the stats width.
+            // Left column under the stats: just Monsters list + Inventory
+            // (the inspector lives in the right column, which has more room).
             mlistsz.x = left_w;
             const int avail = mlistsz.y - mheader;
             if (avail >= mlist_reserve + inv_min)
             {
-                int minfo_h = 0;
-                if (Options.show_monster_info_panel
-                    && avail - mlist_reserve - inv_min >= minfo_want)
-                {
-                    minfo_h = minfo_want;
-                }
-                int inv_h = min(avail - mlist_reserve - minfo_h, inv_max);
+                int inv_h = min(avail - mlist_reserve, inv_max);
                 inv_h = max(inv_h, inv_min);
-                const int mlist_h = avail - minfo_h - inv_h;
+                const int mlist_h = avail - inv_h;
                 mlistp.y += mheader;
                 mlistsz.y = mlist_h;
-                int y = mlistp.y + mlist_h;
-                if (minfo_h > 0)
-                {
-                    minfp  = coord_def(mlistp.x, y);
-                    minfsz = coord_def(left_w, minfo_h);
-                    y += minfo_h;
-                }
-                invp  = coord_def(mlistp.x, y);
+                invp  = coord_def(mlistp.x, mlistp.y + mlist_h);
                 invsz = coord_def(left_w, inv_h);
             }
         }

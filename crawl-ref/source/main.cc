@@ -2312,6 +2312,11 @@ void process_command(command_type cmd, command_type prev_cmd)
         update_screen();
         mprf("Sidebar panels %s.", ui_panels_hidden() ? "hidden" : "shown");
         break;
+    case CMD_CYCLE_MONSTER_PANEL:
+        cycle_monster_panel();
+        update_monster_info_pane();
+        update_screen();
+        break;
     case CMD_DISPLAY_KNOWN_OBJECTS:
         check_item_knowledge();
         redraw_screen();

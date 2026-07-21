@@ -37,6 +37,7 @@ int update_spells_pane();
 void draw_sidebar_frame();
 bool ui_panels_hidden();
 void toggle_ui_panels();
+void cycle_monster_panel();
 
 int equip_slot_by_name(const char *s);
 

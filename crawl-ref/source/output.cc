@@ -2079,10 +2079,14 @@ void draw_sidebar_frame()
     _draw_vrule(crawl_view.hudp.x - 1, top, bot);
 
     int rx = 0;
-    if (crawl_view.abilsz.y > 0 && crawl_view.abilp.x > crawl_view.hudp.x)
+    if (crawl_view.minfsz.y > 0 && crawl_view.minfp.x > crawl_view.hudp.x)
+        rx = crawl_view.minfp.x;
+    else if (crawl_view.abilsz.y > 0 && crawl_view.abilp.x > crawl_view.hudp.x)
         rx = crawl_view.abilp.x;
     else if (crawl_view.skillsz.y > 0 && crawl_view.skillp.x > crawl_view.hudp.x)
         rx = crawl_view.skillp.x;
+    else if (crawl_view.spellsz.y > 0 && crawl_view.spellp.x > crawl_view.hudp.x)
+        rx = crawl_view.spellp.x;
     if (rx > 0)
         _draw_vrule(rx - 1, top, bot);
 
@@ -2208,6 +2212,13 @@ int update_inventory_pane()
 void draw_sidebar_frame() { }
 #endif
 
+// Which monster the inspector panel focuses: -1 = auto (current target, else
+// most threatening); >= 0 = an explicit index into the visible-monster list,
+// advanced by the '*'/CMD_CYCLE_MONSTER_PANEL key and wrapped to -1 past the
+// end. Defined outside the console guard so the dispatch links in every build.
+static int _minf_focus = -1;
+void cycle_monster_panel() { _minf_focus++; }
+
 #ifndef USE_TILE_LOCAL
 static int _threat_colour(mon_threat_level_type t)
 {
@@ -2290,48 +2301,59 @@ int update_monster_info_pane()
         CPRINTF("%s", chop_string(label, width).c_str());
     }
 
-    // Prefer the monster the player is currently targeting; otherwise fall back
-    // to the most threatening visible monster.
-    monster_info target_info;
-    bool have_target = false;
-    if (const monster *tmon = monster_by_mid(you.prev_targ))
-        if (you.can_see(*tmon))
-        {
-            target_info = monster_info(tmon);
-            have_target = true;
-        }
-
     vector<monster_info> mons;
     get_nearby_monster_info(mons);
 
     struct dline { int colour; string text; };
     vector<dline> lines;
 
-    const monster_info *foc = nullptr;
-    if (have_target)
-        foc = &target_info;
-    else if (!mons.empty())
+    if (mons.empty())
     {
-        auto rank = [](mon_threat_level_type t)
-                        { return t == MTHRT_UNDEF ? -1 : (int) t; };
-        foc = &mons[0];
-        for (const monster_info &m : mons)
-            if (rank(m.threat) > rank(foc->threat))
-                foc = &m;
-    }
-
-    if (!foc)
+        _minf_focus = -1;
         lines.push_back({DARKGREY, "Nothing in view."});
+    }
     else
     {
+        // '*' advances _minf_focus through the visible monsters; past the end
+        // it wraps back to -1 ("auto"): the current target if any, else the
+        // most threatening monster.
+        if (_minf_focus >= (int) mons.size())
+            _minf_focus = -1;
+
+        monster_info target_info;
+        const monster_info *foc = nullptr;
+        string suffix;
+        if (_minf_focus >= 0)
+        {
+            foc = &mons[_minf_focus];
+            suffix = make_stringf(" [%d/%d]", _minf_focus + 1, (int) mons.size());
+        }
+        else if (const monster *tmon = monster_by_mid(you.prev_targ))
+        {
+            if (you.can_see(*tmon))
+            {
+                target_info = monster_info(tmon);
+                foc = &target_info;
+                suffix = " [target]";
+            }
+        }
+        if (!foc)
+        {
+            auto rank = [](mon_threat_level_type t)
+                            { return t == MTHRT_UNDEF ? -1 : (int) t; };
+            foc = &mons[0];
+            for (const monster_info &m : mons)
+                if (rank(m.threat) > rank(foc->threat))
+                    foc = &m;
+        }
+
         const monster_info &mi = *foc;
 
         const string tw = _threat_word(mi.threat);
         string title = mi.common_name(DESC_PLAIN);
         if (!tw.empty())
             title += " (" + tw + ")";
-        if (have_target)
-            title += " [target]";
+        title += suffix;
         lines.push_back({_threat_colour(mi.threat), title});
 
         // Match the fields the in-game examine screen shows: base_ev for EV,
