@@ -436,69 +436,117 @@ void crawl_view_geometry::init_geometry()
     skillsz = coord_def(0, 0);
 #ifndef USE_TILE_LOCAL
     // Only the default (inline) layout stacks the monster list directly below
-    // the HUD, which is the space these sidebar panels are carved from. The
-    // right column becomes a stack (Monsters list / Monster inspector /
-    // Abilities / Skills / Inventory); optional panels are added in priority
-    // order as vertical room allows, so larger terminals surface more of them.
-    // Small terminals — and the Ctrl-V toggle — fall back to the classic view.
+    // the HUD, which is the space these sidebar panels are carved from. When
+    // the sidebar is wide enough we split it into two columns: the left column
+    // (Monsters / Monster inspector / Inventory) sits under the stats, and a
+    // right column (Abilities / Skills) fills the space beside the stats that
+    // was otherwise blank. Narrow terminals fall back to a single stacked
+    // column, and Ctrl-V (or a small terminal) drops back to the classic view.
     if (Options.show_inventory_panel && !ui_panels_hidden() && winner == &lay_inline)
     {
-        const int mheader       = 1;   // "Monsters" title rule above the list
-        const int avail         = mlistsz.y - mheader;
-        const int mlist_reserve = 5;   // rows kept for the monster list body
-        const int inv_min       = 6;
-        const int inv_max       = 54;  // 52 slots + header + overflow line
-        const int minfo_want    = 12;  // each optional panel incl. its header
-        const int abil_want     = 8;
-        const int skill_want    = 8;
-        if (avail >= mlist_reserve + inv_min)
+        const int mheader   = 1;        // "Monsters" title rule above the list
+        const int left_w    = hudsz.x;  // stats/HUD width; the left column width
+        const int gutter    = 1;
+        const int sidebar_w = mlistsz.x;
+        const int mlist_reserve = 5;
+        const int inv_min   = 6;
+        const int inv_max   = 54;
+        const int minfo_want = 12;
+        const bool two_col  = sidebar_w >= left_w + gutter + 33;
+
+        if (two_col)
         {
-            int budget = avail - mlist_reserve - inv_min; // rows beyond essentials
-            int minfo_h = 0, abil_h = 0, skill_h = 0;
-            if (Options.show_monster_info_panel && budget >= minfo_want)
+            // Right column beside the stats: Abilities on top, Skills below.
+            const int right_x = hudp.x + left_w + gutter;
+            const int right_w = sidebar_w - left_w - gutter;
+            const int top     = hudp.y;
+            const int right_h = msgp.y - top;   // full sidebar height
+            const bool wa = Options.show_abilities_panel;
+            const bool ws = Options.show_skills_panel;
+            int abil_h = 0, skill_h = 0;
+            if (wa && ws && right_h >= 8)
             {
-                minfo_h = minfo_want;
-                budget -= minfo_want;
+                abil_h  = right_h / 2;
+                skill_h = right_h - abil_h;
             }
-            if (Options.show_abilities_panel && budget >= abil_want)
-            {
-                abil_h = abil_want;
-                budget -= abil_want;
-            }
-            if (Options.show_skills_panel && budget >= skill_want)
-            {
-                skill_h = skill_want;
-                budget -= skill_want;
-            }
-
-            const int optional = minfo_h + abil_h + skill_h;
-            int inv_h = min(avail - mlist_reserve - optional, inv_max);
-            inv_h = max(inv_h, inv_min);
-            const int mlist_h = avail - optional - inv_h;
-
-            mlistp.y += mheader;        // list starts below its title rule
-            mlistsz.y = mlist_h;
-            int y = mlistp.y + mlist_h; // running top of the next panel
-            if (minfo_h > 0)
-            {
-                minfp  = coord_def(mlistp.x, y);
-                minfsz = coord_def(mlistsz.x, minfo_h);
-                y += minfo_h;
-            }
+            else if (wa && right_h >= 2)
+                abil_h = right_h;
+            else if (ws && right_h >= 2)
+                skill_h = right_h;
+            int ry = top;
             if (abil_h > 0)
             {
-                abilp  = coord_def(mlistp.x, y);
-                abilsz = coord_def(mlistsz.x, abil_h);
-                y += abil_h;
+                abilp  = coord_def(right_x, ry);
+                abilsz = coord_def(right_w, abil_h);
+                ry += abil_h;
             }
             if (skill_h > 0)
             {
-                skillp  = coord_def(mlistp.x, y);
-                skillsz = coord_def(mlistsz.x, skill_h);
-                y += skill_h;
+                skillp  = coord_def(right_x, ry);
+                skillsz = coord_def(right_w, skill_h);
             }
-            invp  = coord_def(mlistp.x, y);
-            invsz = coord_def(mlistsz.x, inv_h);
+
+            // Left column below the HUD, narrowed to the stats width.
+            mlistsz.x = left_w;
+            const int avail = mlistsz.y - mheader;
+            if (avail >= mlist_reserve + inv_min)
+            {
+                int minfo_h = 0;
+                if (Options.show_monster_info_panel
+                    && avail - mlist_reserve - inv_min >= minfo_want)
+                {
+                    minfo_h = minfo_want;
+                }
+                int inv_h = min(avail - mlist_reserve - minfo_h, inv_max);
+                inv_h = max(inv_h, inv_min);
+                const int mlist_h = avail - minfo_h - inv_h;
+                mlistp.y += mheader;
+                mlistsz.y = mlist_h;
+                int y = mlistp.y + mlist_h;
+                if (minfo_h > 0)
+                {
+                    minfp  = coord_def(mlistp.x, y);
+                    minfsz = coord_def(left_w, minfo_h);
+                    y += minfo_h;
+                }
+                invp  = coord_def(mlistp.x, y);
+                invsz = coord_def(left_w, inv_h);
+            }
+        }
+        else
+        {
+            // Narrow: a single stacked column, panels added in priority order.
+            const int abil_want  = 8;
+            const int skill_want = 8;
+            const int avail = mlistsz.y - mheader;
+            if (avail >= mlist_reserve + inv_min)
+            {
+                int budget = avail - mlist_reserve - inv_min;
+                int minfo_h = 0, abil_h = 0, skill_h = 0;
+                if (Options.show_monster_info_panel && budget >= minfo_want)
+                    { minfo_h = minfo_want; budget -= minfo_want; }
+                if (Options.show_abilities_panel && budget >= abil_want)
+                    { abil_h = abil_want; budget -= abil_want; }
+                if (Options.show_skills_panel && budget >= skill_want)
+                    { skill_h = skill_want; budget -= skill_want; }
+
+                const int optional = minfo_h + abil_h + skill_h;
+                int inv_h = min(avail - mlist_reserve - optional, inv_max);
+                inv_h = max(inv_h, inv_min);
+                const int mlist_h = avail - optional - inv_h;
+
+                mlistp.y += mheader;
+                mlistsz.y = mlist_h;
+                int y = mlistp.y + mlist_h;
+                if (minfo_h > 0)
+                    { minfp = coord_def(mlistp.x, y); minfsz = coord_def(mlistsz.x, minfo_h); y += minfo_h; }
+                if (abil_h > 0)
+                    { abilp = coord_def(mlistp.x, y); abilsz = coord_def(mlistsz.x, abil_h); y += abil_h; }
+                if (skill_h > 0)
+                    { skillp = coord_def(mlistp.x, y); skillsz = coord_def(mlistsz.x, skill_h); y += skill_h; }
+                invp  = coord_def(mlistp.x, y);
+                invsz = coord_def(mlistsz.x, inv_h);
+            }
         }
     }
 #endif

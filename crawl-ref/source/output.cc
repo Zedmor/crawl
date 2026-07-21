@@ -2045,6 +2045,60 @@ static string _inv_category_name(object_class_type base)
     }
 }
 
+static void _draw_vrule(int x, int y0, int y1)
+{
+    if (x < 1)
+        return;
+    textcolour(BLUE);
+    for (int y = y0; y <= y1; ++y)
+    {
+        CGOTOXY(x, y, GOTO_CRT);
+        CPRINTF("│");
+    }
+}
+
+// Framing shared by the sidebar panels: the vertical rule left of the panel
+// column, a second rule between the columns in two-column mode, and the
+// "Monsters" header above the (shifted-down) monster list. Kept separate from
+// the panels so it renders regardless of which panels are currently present.
+void draw_sidebar_frame()
+{
+    const bool any = crawl_view.invsz.y > 0 || crawl_view.minfsz.y > 0
+                  || crawl_view.abilsz.y > 0 || crawl_view.skillsz.y > 0;
+    if (!any)
+        return;
+
+    save_cursor_pos save;
+    textbackground(BLACK);
+    const int top = crawl_view.hudp.y;
+    const int bot = crawl_view.msgp.y - 1;
+
+    _draw_vrule(crawl_view.hudp.x - 1, top, bot);
+
+    int rx = 0;
+    if (crawl_view.abilsz.y > 0 && crawl_view.abilp.x > crawl_view.hudp.x)
+        rx = crawl_view.abilp.x;
+    else if (crawl_view.skillsz.y > 0 && crawl_view.skillp.x > crawl_view.hudp.x)
+        rx = crawl_view.skillp.x;
+    if (rx > 0)
+        _draw_vrule(rx - 1, top, bot);
+
+    if (crawl_view.invsz.y > 0 || crawl_view.minfsz.y > 0)
+    {
+        const int my = crawl_view.mlistp.y - 1;
+        if (my >= 1)
+        {
+            CGOTOXY(crawl_view.mlistp.x, my, GOTO_CRT);
+            textcolour(BLUE);
+            string label = "─ Monsters ";
+            while (strwidth(label) < crawl_view.mlistsz.x)
+                label += "─";
+            CPRINTF("%s", chop_string(label, crawl_view.mlistsz.x).c_str());
+        }
+    }
+    textcolour(LIGHTGREY);
+}
+
 // Persistent inventory side-panel, drawn in the GOTO_INV region that
 // crawl_view_geometry::init_geometry carves out of the bottom of the
 // monster-list column. Modelled on update_monster_pane(): it redraws in full
@@ -2140,39 +2194,6 @@ int update_inventory_pane()
         }
     }
 
-    // Cogmind-style vertical rule down the left edge of the sidebar column,
-    // tying the stats / monster / inventory panels into one visual unit. Drawn
-    // in the blank HUD gutter (the column just left of the stats panel), so it
-    // never overlaps map or panel content.
-    const int sepx = crawl_view.hudp.x - 1;
-    if (sepx >= 1)
-    {
-        textcolour(BLUE);
-        const int y0 = crawl_view.hudp.y;
-        const int y1 = crawl_view.invp.y + crawl_view.invsz.y - 1;
-        for (int y = y0; y <= y1; ++y)
-        {
-            CGOTOXY(sepx, y, GOTO_CRT);
-            CPRINTF("│");
-        }
-    }
-
-    // "Monsters" panel header, drawn one row above the monster list. The layout
-    // reserves this row (mlistp.y is shifted down) when the panel is active, so
-    // it never clobbers a monster entry.
-    {
-        const int my = crawl_view.mlistp.y - 1;
-        if (my >= 1)
-        {
-            CGOTOXY(crawl_view.mlistp.x, my, GOTO_CRT);
-            textcolour(BLUE);
-            string label = "─ Monsters ";
-            while (strwidth(label) < crawl_view.mlistsz.x)
-                label += "─";
-            CPRINTF("%s", chop_string(label, crawl_view.mlistsz.x).c_str());
-        }
-    }
-
     textcolour(LIGHTGREY);
     return items.size();
 }
@@ -2181,6 +2202,7 @@ int update_inventory_pane()
 {
     return false;
 }
+void draw_sidebar_frame() { }
 #endif
 
 #ifndef USE_TILE_LOCAL
@@ -2265,29 +2287,48 @@ int update_monster_info_pane()
         CPRINTF("%s", chop_string(label, width).c_str());
     }
 
+    // Prefer the monster the player is currently targeting; otherwise fall back
+    // to the most threatening visible monster.
+    monster_info target_info;
+    bool have_target = false;
+    if (const monster *tmon = monster_by_mid(you.prev_targ))
+        if (you.can_see(*tmon))
+        {
+            target_info = monster_info(tmon);
+            have_target = true;
+        }
+
     vector<monster_info> mons;
     get_nearby_monster_info(mons);
 
     struct dline { int colour; string text; };
     vector<dline> lines;
 
-    if (mons.empty())
-        lines.push_back({DARKGREY, "Nothing in view."});
-    else
+    const monster_info *foc = nullptr;
+    if (have_target)
+        foc = &target_info;
+    else if (!mons.empty())
     {
-        // Focus the most threatening monster (ignoring undefined threat).
         auto rank = [](mon_threat_level_type t)
                         { return t == MTHRT_UNDEF ? -1 : (int) t; };
-        const monster_info *foc = &mons[0];
+        foc = &mons[0];
         for (const monster_info &m : mons)
             if (rank(m.threat) > rank(foc->threat))
                 foc = &m;
+    }
+
+    if (!foc)
+        lines.push_back({DARKGREY, "Nothing in view."});
+    else
+    {
         const monster_info &mi = *foc;
 
         const string tw = _threat_word(mi.threat);
         string title = mi.common_name(DESC_PLAIN);
         if (!tw.empty())
             title += " (" + tw + ")";
+        if (have_target)
+            title += " [target]";
         lines.push_back({_threat_colour(mi.threat), title});
 
         // Match the fields the in-game examine screen shows: base_ev for EV,
@@ -2481,16 +2522,16 @@ int update_skills_pane()
         const skill_type sk = static_cast<skill_type>(i);
         if (is_useless_skill(sk))
             continue;
-        const int lvl = you.skill(sk, 10);   // level * 10
-        if (lvl <= 0)
+        // Only skills currently receiving XP (training percentage > 0).
+        if (you.training[sk] <= 0)
             continue;
-        const bool training = you.training[sk] > 0;
-        lines.push_back({training ? LIGHTGREEN : LIGHTGREY,
-                         make_stringf("%-13.13s %2d.%d", skill_name(sk),
-                                      lvl / 10, lvl % 10)});
+        const int lvl = you.skill(sk, 10);   // level * 10
+        lines.push_back({LIGHTGREEN,
+                         make_stringf("%-12.12s %2d.%d %2u%%", skill_name(sk),
+                                      lvl / 10, lvl % 10, you.training[sk])});
     }
     if (lines.empty())
-        lines.push_back({DARKGREY, "No skills trained."});
+        lines.push_back({DARKGREY, "No skills training."});
 
     const int body_lines = height - 1;
     const bool overflow = (int) lines.size() > body_lines;

@@ -33,6 +33,7 @@ int update_inventory_pane();
 int update_monster_info_pane();
 int update_abilities_pane();
 int update_skills_pane();
+void draw_sidebar_frame();
 bool ui_panels_hidden();
 void toggle_ui_panels();
 
