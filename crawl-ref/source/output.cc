@@ -2021,6 +2021,164 @@ int update_monster_pane()
 }
 #endif
 
+#ifndef USE_TILE_LOCAL
+static string _inv_category_name(object_class_type base)
+{
+    switch (base)
+    {
+    case OBJ_WEAPONS:    return "Weapons";
+    case OBJ_MISSILES:   return "Missiles";
+    case OBJ_ARMOUR:     return "Armour";
+    case OBJ_JEWELLERY:  return "Jewellery";
+    case OBJ_TALISMANS:  return "Talismans";
+    case OBJ_STAVES:     return "Magical Staves";
+    case OBJ_WANDS:      return "Wands";
+    case OBJ_SCROLLS:    return "Scrolls";
+    case OBJ_POTIONS:    return "Potions";
+    case OBJ_BOOKS:      return "Books";
+    case OBJ_MISCELLANY: return "Miscellany";
+    default:             return "Other";
+    }
+}
+
+// Persistent inventory side-panel, drawn in the GOTO_INV region that
+// crawl_view_geometry::init_geometry carves out of the bottom of the
+// monster-list column. Modelled on update_monster_pane(): it redraws in full
+// on each viewwindow refresh. Items are grouped under category sub-headers
+// (matching Crawl's own per-category letter scoping) and any overflow past the
+// panel height is summarised with a (…) line.
+int update_inventory_pane()
+{
+    if (crawl_view.invsz.y <= 0 || crawl_view.invsz.x <= 0)
+        return -1;
+    if (!map_bounds(you.pos()) && !crawl_state.game_is_arena())
+        return -1;
+
+    const int width  = crawl_view.invsz.x;
+    const int height = crawl_view.invsz.y;
+
+    save_cursor_pos save;
+    textbackground(BLACK);
+
+    // Collect carried items, then sort by (category, slot letter) so each
+    // category clusters and reads in its own letter order.
+    vector<const item_def *> items;
+    for (int i = 0; i < ENDOFPACK; ++i)
+        if (you.inv[i].defined())
+            items.push_back(&you.inv[i]);
+    sort(items.begin(), items.end(),
+         [](const item_def *a, const item_def *b)
+         {
+             if (a->base_type != b->base_type)
+                 return a->base_type < b->base_type;
+             return a->slot < b->slot;
+         });
+
+    // Flatten into display lines: a category sub-header whenever the category
+    // changes, followed by its (indented) item rows.
+    struct dline { int colour; string text; bool is_item; };
+    vector<dline> lines;
+    object_class_type cur = NUM_OBJECT_CLASSES;
+    for (const item_def *it : items)
+    {
+        if (it->base_type != cur)
+        {
+            cur = it->base_type;
+            lines.push_back({CYAN, _inv_category_name(cur), false});
+        }
+        const string name = it->name(DESC_INVENTORY_EQUIP, false);
+        int col = menu_colour(name, item_prefix(*it), "inventory", false);
+        if (col < 0)
+            col = LIGHTGREY;
+        lines.push_back({col, " " + name, true});
+    }
+
+    const string blank(width, ' ');
+
+    // Header: a Cogmind-style titled rule spanning the panel width.
+    CGOTOXY(1, 1, GOTO_INV);
+    textcolour(BLUE);
+    {
+        string label = make_stringf("─ Inventory (%d) ", (int) items.size());
+        while (strwidth(label) < width)
+            label += "─";
+        CPRINTF("%s", chop_string(label, width).c_str());
+    }
+
+    // Body: render the display lines. If they don't all fit, the last row
+    // becomes a "(… N more)" marker counting the unseen *items*.
+    const int body_lines = height - 1;
+    const bool overflow  = (int) lines.size() > body_lines;
+    const int shown      = overflow ? body_lines - 1 : (int) lines.size();
+
+    for (int i = 0; i < body_lines; ++i)
+    {
+        CGOTOXY(1, 2 + i, GOTO_INV);
+        if (i < shown)
+        {
+            textcolour(lines[i].colour);
+            CPRINTF("%s", chop_string(lines[i].text, width).c_str());
+        }
+        else if (overflow && i == body_lines - 1)
+        {
+            int rest = 0;
+            for (int j = shown; j < (int) lines.size(); ++j)
+                if (lines[j].is_item)
+                    ++rest;
+            textcolour(BROWN);
+            CPRINTF("%s", chop_string(make_stringf("(… %d more)", rest),
+                                      width).c_str());
+        }
+        else
+        {
+            textcolour(LIGHTGREY);
+            CPRINTF("%s", blank.c_str());
+        }
+    }
+
+    // Cogmind-style vertical rule down the left edge of the sidebar column,
+    // tying the stats / monster / inventory panels into one visual unit. Drawn
+    // in the blank HUD gutter (the column just left of the stats panel), so it
+    // never overlaps map or panel content.
+    const int sepx = crawl_view.hudp.x - 1;
+    if (sepx >= 1)
+    {
+        textcolour(BLUE);
+        const int y0 = crawl_view.hudp.y;
+        const int y1 = crawl_view.invp.y + crawl_view.invsz.y - 1;
+        for (int y = y0; y <= y1; ++y)
+        {
+            CGOTOXY(sepx, y, GOTO_CRT);
+            CPRINTF("│");
+        }
+    }
+
+    // "Monsters" panel header, drawn one row above the monster list. The layout
+    // reserves this row (mlistp.y is shifted down) when the panel is active, so
+    // it never clobbers a monster entry.
+    {
+        const int my = crawl_view.mlistp.y - 1;
+        if (my >= 1)
+        {
+            CGOTOXY(crawl_view.mlistp.x, my, GOTO_CRT);
+            textcolour(BLUE);
+            string label = "─ Monsters ";
+            while (strwidth(label) < crawl_view.mlistsz.x)
+                label += "─";
+            CPRINTF("%s", chop_string(label, crawl_view.mlistsz.x).c_str());
+        }
+    }
+
+    textcolour(LIGHTGREY);
+    return items.size();
+}
+#else
+int update_inventory_pane()
+{
+    return false;
+}
+#endif
+
 int equip_slot_by_name(const char *s)
 {
     for (int i = SLOT_FIRST_STANDARD; i <= SLOT_LAST_STANDARD; ++i)

@@ -358,6 +358,8 @@ static coord_def _cgettopleft(GotoRegion region)
     {
     case GOTO_MLIST:
         return crawl_view.mlistp;
+    case GOTO_INV:
+        return crawl_view.invp;
     case GOTO_STAT:
         return crawl_view.hudp;
     case GOTO_MSG:
@@ -462,6 +464,8 @@ coord_def cgetsize(GotoRegion region)
     {
     case GOTO_MLIST:
         return crawl_view.mlistsz;
+    case GOTO_INV:
+        return crawl_view.invsz;
     case GOTO_STAT:
         return crawl_view.hudsz;
     case GOTO_MSG:

@@ -419,6 +419,37 @@ void crawl_view_geometry::init_geometry()
     mlistp  = winner->mlistp;
     mlistsz = winner->mlistsz;
 
+    // Carve an always-on inventory panel out of the bottom of the monster-list
+    // column, when enabled and there is enough vertical room. This is the
+    // Cogmind-style "persistent side panel": larger terminals yield a taller
+    // panel (more of the pack visible at once), while small terminals keep the
+    // classic layout untouched (graceful degradation). Items past the panel's
+    // height are summarised with a (…) marker, exactly like the monster list.
+    invp  = coord_def(0, 0);
+    invsz = coord_def(0, 0);
+#ifndef USE_TILE_LOCAL
+    // Only the default (inline) layout stacks the monster list directly below
+    // the HUD, which is the space the inventory panel is carved from.
+    if (Options.show_inventory_panel && winner == &lay_inline)
+    {
+        const int mheader = 1;         // "Monsters" title rule above the list
+        const int avail = mlistsz.y - mheader;
+        const int mlist_reserve = 6;   // rows kept for the monster list
+        const int inv_min = 6;
+        const int inv_max = 54;        // 52 slots + header + overflow line
+        if (avail >= mlist_reserve + inv_min)
+        {
+            int inv_h = min(avail - mlist_reserve, inv_max);
+            inv_h = max(inv_h, inv_min);
+            const int mlist_h = avail - inv_h;
+            mlistp.y  += mheader;       // list starts below its title rule
+            mlistsz.y  = mlist_h;
+            invsz = coord_def(mlistsz.x, inv_h);
+            invp  = coord_def(mlistp.x, mlistp.y + mlist_h);
+        }
+    }
+#endif
+
 #ifdef USE_TILE_LOCAL
     // libgui may redefine these based on its own settings.
     gui_init_view_params(*this);

@@ -474,6 +474,7 @@ public:
     int         msg_max_height;
     int         msg_webtiles_height;
     bool        mlist_allow_alternate_layout;
+    bool        show_inventory_panel;
     bool        monster_item_view_coordinates;
     vector<text_pattern> monster_item_view_features;
     bool        messages_at_top;

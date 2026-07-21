@@ -60,6 +60,8 @@ public:
     coord_def msgsz;               // Size of the message pane.
     coord_def mlistp;              // Left-top pos of the monster list.
     coord_def mlistsz;             // Size of the monster list.
+    coord_def invp;                // Left-top pos of the inventory panel.
+    coord_def invsz;               // Size of the inventory panel.
 
     coord_def vgrdc;               // What grid pos is at the centre of the view
                                    // usually you.pos().
