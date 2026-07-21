@@ -787,21 +787,40 @@ viewport.
 None of these options affects gameplay. In particular, your character's
 line-of-sight is unaffected by these options.
 
-view_max_width = 33 (max 81)
-        Sets the maximum width of the viewport (defaults to 33).
-        Making this larger will allow Crawl to show a wider viewport
-        on larger terminals. This is ignored in tiles, the viewport will
-        always use all the available space.
+view_max_width = 55 (max 81)
+        Sets the initial maximum width of the viewport. (This fork defaults to
+        55 rather than the upstream 33 to keep the map the focus.) Note that the
+        console layout also lets the map fill any width the capped sidebar
+        panels leave, up to the level width, so the map grows on wide terminals
+        regardless of this value. This is ignored in tiles.
 
-view_max_height = 21 (max 71)
-        Similar to view_max_width, but sets the viewport's maximum height.
-        In tiles, this value is used to set when space starts to be affected
-        to the message area instead of the viewport. When the message area
-        reaches msg_max_height, the remaining space goes to the viewport.
-        If for performance reason you need a smaller viewport, either reduce
-        the window size, or increase the message area.
+view_max_height = 45 (max 71)
+        Similar to view_max_width, but for the viewport's height. (Fork default
+        45 rather than upstream 21.) In console the map also fills the space
+        beneath it, down to the message area, so tall terminals put the extra
+        room into the game field.
 
 * Note that using large viewports can slow the game down.
+
+##### Console sidebar panels (fork) #####################################
+
+The console build shows a stack of always-on panels beside/below the stats:
+Monsters list, Monster inspector (stats + resistances + encyclopedia lore for
+your current target or the most threatening foe), Abilities, Skills, and
+Spells (memorised + learnable, with the spell-level budget in the header). On
+wide terminals these split into two columns; on small terminals they fall back
+to the classic layout. The panel column is width-capped so it never hogs a
+wide terminal.
+
+Keys: Ctrl-V hides/shows the whole panel stack; Space cycles the Monster
+inspector through the visible monsters (rebind either via bindkey).
+
+show_inventory_panel = true
+show_monster_info_panel = true
+show_abilities_panel = true
+show_skills_panel = true
+show_spells_panel = true
+        Toggle each panel individually. All default to true.
 
 view_lock_x = true
         Keeps the player character centred horizontally in the
