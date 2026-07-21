@@ -21,6 +21,7 @@
 #include "describe.h"
 #include "mon-util.h"
 #include "skills.h"
+#include "spl-book.h"
 #include "spl-cast.h"
 #include "spl-util.h"
 #ifndef USE_TILE_LOCAL
@@ -2607,6 +2608,8 @@ int update_spells_pane()
 
     struct dline { int colour; string text; };
     vector<dline> lines;
+
+    // Memorised (castable) spells, with their cast letter.
     for (const spell_type spell : you.spells)
     {
         if (spell == SPELL_NO_SPELL)
@@ -2618,6 +2621,39 @@ int update_spells_pane()
                          letter > 0 ? (char) letter : '-',
                          spell_title(spell), fail, spell_difficulty(spell))});
     }
+
+    // Learnable spells from your library that you haven't memorised yet,
+    // including ones still out of reach (dimmed): too high level or over your
+    // spell-level budget.
+    vector<spell_type> learn;
+    for (int i = 0; i < NUM_SPELLS; ++i)
+    {
+        const spell_type sp = static_cast<spell_type>(i);
+        if (you.spell_library[sp] && !you.has_spell(sp))
+            learn.push_back(sp);
+    }
+    sort(learn.begin(), learn.end(), [](spell_type a, spell_type b)
+    {
+        if (spell_difficulty(a) != spell_difficulty(b))
+            return spell_difficulty(a) < spell_difficulty(b);
+        return raw_spell_fail(a) < raw_spell_fail(b);
+    });
+    if (!learn.empty())
+    {
+        lines.push_back({CYAN, "Learnable:"});
+        for (const spell_type sp : learn)
+        {
+            const int lvl = spell_difficulty(sp);
+            const bool ready = you_can_memorise(sp)
+                               && lvl <= you.experience_level
+                               && lvl <= player_spell_levels();
+            const int fail = failure_rate_to_int(raw_spell_fail(sp));
+            lines.push_back({ready ? LIGHTGREY : DARKGREY,
+                make_stringf("  %-16.16s %2d%% L%d",
+                             spell_title(sp), fail, lvl)});
+        }
+    }
+
     if (lines.empty())
         lines.push_back({DARKGREY, "No spells known."});
 
