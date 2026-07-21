@@ -502,6 +502,7 @@ const vector<GameOption*> game_options::build_options_list()
                            {"mlist_allow_alternative_layout",
                             "mlist_allow_alternate_layout"}, false),
         new BoolGameOption(SIMPLE_NAME(show_inventory_panel), true),
+        new BoolGameOption(SIMPLE_NAME(show_monster_info_panel), true),
         new BoolGameOption(SIMPLE_NAME(monster_item_view_coordinates), false),
         new ListGameOption<text_pattern>(SIMPLE_NAME(monster_item_view_features), {}, true),
         new BoolGameOption(SIMPLE_NAME(messages_at_top), false),

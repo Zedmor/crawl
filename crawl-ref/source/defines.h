@@ -393,6 +393,7 @@ enum GotoRegion
     GOTO_DNGN, // cprintf > dungeon screen
     GOTO_MLIST,// cprintf > monster list
     GOTO_INV,  // cprintf > inventory panel
+    GOTO_MINF, // cprintf > monster info panel
 };
 
 // Mouse modes (for tiles)

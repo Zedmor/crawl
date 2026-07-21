@@ -16,7 +16,9 @@
 #include "areas.h"
 #include "branch.h"
 #include "colour.h"
+#include "database.h"
 #include "describe.h"
+#include "mon-util.h"
 #ifndef USE_TILE_LOCAL
 #endif
 #include "english.h"
@@ -2174,6 +2176,199 @@ int update_inventory_pane()
 }
 #else
 int update_inventory_pane()
+{
+    return false;
+}
+#endif
+
+#ifndef USE_TILE_LOCAL
+static int _threat_colour(mon_threat_level_type t)
+{
+    switch (t)
+    {
+    case MTHRT_TRIVIAL: return DARKGREY;
+    case MTHRT_EASY:    return LIGHTGREY;
+    case MTHRT_TOUGH:   return YELLOW;
+    case MTHRT_NASTY:   return LIGHTRED;
+    default:            return LIGHTGREY;
+    }
+}
+
+static string _threat_word(mon_threat_level_type t)
+{
+    switch (t)
+    {
+    case MTHRT_TRIVIAL: return "trivial";
+    case MTHRT_EASY:    return "easy";
+    case MTHRT_TOUGH:   return "dangerous";
+    case MTHRT_NASTY:   return "very dangerous";
+    default:            return "";
+    }
+}
+
+// Compact "rF++ rC+ rPois" style summary of the resistances the player knows.
+static string _mi_resist_str(const monster_info &mi)
+{
+    const struct { mon_resist_flags flag; const char *name; int cap; } defs[] =
+    {
+        { MR_RES_FIRE,   "rF",    3 },
+        { MR_RES_COLD,   "rC",    3 },
+        { MR_RES_ELEC,   "rElec", 1 },
+        { MR_RES_POISON, "rPois", 1 },
+        { MR_RES_NEG,    "rN",    3 },
+        { MR_RES_CORR,   "rCorr", 1 },
+    };
+    string out;
+    for (const auto &d : defs)
+    {
+        const int lvl = get_resist(mi.resists(), d.flag);
+        if (!lvl)
+            continue;
+        string s = d.name;
+        if (lvl < 0)
+            s += "x";
+        else
+            for (int i = 0; i < min(lvl, d.cap); ++i)
+                s += "+";
+        if (!out.empty())
+            out += " ";
+        out += s;
+    }
+    return out;
+}
+
+// Persistent monster inspector: details the most-threatening visible monster
+// using only monster_info (the player-knowledge view), plus its encyclopedia
+// lore from the descriptions database. Nothing hidden from the player is shown.
+int update_monster_info_pane()
+{
+    if (crawl_view.minfsz.y <= 0 || crawl_view.minfsz.x <= 0)
+        return -1;
+    if (!map_bounds(you.pos()) && !crawl_state.game_is_arena())
+        return -1;
+
+    const int width  = crawl_view.minfsz.x;
+    const int height = crawl_view.minfsz.y;
+    save_cursor_pos save;
+    textbackground(BLACK);
+    const string blank(width, ' ');
+
+    // Header rule.
+    CGOTOXY(1, 1, GOTO_MINF);
+    textcolour(BLUE);
+    {
+        string label = "─ Monster ";
+        while (strwidth(label) < width)
+            label += "─";
+        CPRINTF("%s", chop_string(label, width).c_str());
+    }
+
+    vector<monster_info> mons;
+    get_nearby_monster_info(mons);
+
+    struct dline { int colour; string text; };
+    vector<dline> lines;
+
+    if (mons.empty())
+        lines.push_back({DARKGREY, "Nothing in view."});
+    else
+    {
+        // Focus the most threatening monster (ignoring undefined threat).
+        auto rank = [](mon_threat_level_type t)
+                        { return t == MTHRT_UNDEF ? -1 : (int) t; };
+        const monster_info *foc = &mons[0];
+        for (const monster_info &m : mons)
+            if (rank(m.threat) > rank(foc->threat))
+                foc = &m;
+        const monster_info &mi = *foc;
+
+        const string tw = _threat_word(mi.threat);
+        string title = mi.common_name(DESC_PLAIN);
+        if (!tw.empty())
+            title += " (" + tw + ")";
+        lines.push_back({_threat_colour(mi.threat), title});
+
+        // Match the fields the in-game examine screen shows: base_ev for EV,
+        // sh/2 to match the player's SH scale, plus the known Max HP.
+        lines.push_back({LIGHTGREY, make_stringf("HD %d  HP %s",
+                                     mi.hd, mi.get_max_hp_desc().c_str())});
+        lines.push_back({LIGHTGREY, make_stringf("AC %d  EV %d  SH %d",
+                                     mi.ac, mi.base_ev, mi.sh / 2)});
+
+        // Willpower (as pips) and speed.
+        {
+            string wl = "Will: ";
+            if (mi.willpower() >= WILL_INVULN)
+                wl += "invln";
+            else
+            {
+                const int pips = mi.willpower() / WL_PIP;
+                wl += pips <= 0 ? "." : string(pips, '+');
+            }
+            const string sd = mi.speed_description();
+            if (!sd.empty())
+                wl += "  " + sd;
+            lines.push_back({LIGHTGREY, wl});
+        }
+
+        // Wound state (what the player can gauge).
+        {
+            const string ws = mi.wounds_description();
+            if (!ws.empty())
+                lines.push_back({YELLOW, ws});
+        }
+
+        // Known resistances and a couple of at-a-glance flags.
+        {
+            string r = _mi_resist_str(mi);
+            if (mi.can_see_invisible())
+                r += string(r.empty() ? "" : " ") + "SInv";
+            if (!r.empty())
+                lines.push_back({LIGHTCYAN, r});
+        }
+
+        // Encyclopedia lore, reflowed to the panel width.
+        {
+            string lore = getLongDescription(mi.db_name());
+            for (char &c : lore)
+                if (c == '\n')
+                    c = ' ';
+            while (!lore.empty() && lore.back() == ' ')
+                lore.pop_back();
+            if (!lore.empty())
+            {
+                lines.push_back({DARKGREY, ""});
+                while (!lore.empty())
+                {
+                    const string ln = wordwrap_line(lore, width);
+                    if (ln.empty())
+                        break;
+                    lines.push_back({LIGHTGREY, ln});
+                }
+            }
+        }
+    }
+
+    const int body_lines = height - 1;
+    for (int i = 0; i < body_lines; ++i)
+    {
+        CGOTOXY(1, 2 + i, GOTO_MINF);
+        if (i < (int) lines.size())
+        {
+            textcolour(lines[i].colour);
+            CPRINTF("%s", chop_string(lines[i].text, width).c_str());
+        }
+        else
+        {
+            textcolour(LIGHTGREY);
+            CPRINTF("%s", blank.c_str());
+        }
+    }
+    textcolour(LIGHTGREY);
+    return mons.size();
+}
+#else
+int update_monster_info_pane()
 {
     return false;
 }

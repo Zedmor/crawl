@@ -425,27 +425,46 @@ void crawl_view_geometry::init_geometry()
     // panel (more of the pack visible at once), while small terminals keep the
     // classic layout untouched (graceful degradation). Items past the panel's
     // height are summarised with a (…) marker, exactly like the monster list.
-    invp  = coord_def(0, 0);
-    invsz = coord_def(0, 0);
+    invp   = coord_def(0, 0);
+    invsz  = coord_def(0, 0);
+    minfp  = coord_def(0, 0);
+    minfsz = coord_def(0, 0);
 #ifndef USE_TILE_LOCAL
     // Only the default (inline) layout stacks the monster list directly below
-    // the HUD, which is the space the inventory panel is carved from.
+    // the HUD, which is the space these sidebar panels are carved from. The
+    // right column becomes a stack: Monsters list / Monster inspector /
+    // Inventory. Larger terminals fit more of the stack; small ones fall back.
     if (Options.show_inventory_panel && winner == &lay_inline)
     {
-        const int mheader = 1;         // "Monsters" title rule above the list
-        const int avail = mlistsz.y - mheader;
-        const int mlist_reserve = 6;   // rows kept for the monster list
-        const int inv_min = 6;
-        const int inv_max = 54;        // 52 slots + header + overflow line
+        const int mheader       = 1;   // "Monsters" title rule above the list
+        const int avail         = mlistsz.y - mheader;
+        const int mlist_reserve = 5;   // rows kept for the monster list body
+        const int inv_min       = 6;
+        const int inv_max       = 54;  // 52 slots + header + overflow line
+        const int minfo_want    = 12;  // monster inspector incl. its own header
         if (avail >= mlist_reserve + inv_min)
         {
-            int inv_h = min(avail - mlist_reserve, inv_max);
+            // The inspector only appears when there's ample room, so it shows
+            // up on larger terminals without starving the other panels.
+            int minfo_h = 0;
+            if (Options.show_monster_info_panel
+                && avail >= mlist_reserve + minfo_want + inv_min)
+            {
+                minfo_h = minfo_want;
+            }
+            int inv_h = min(avail - mlist_reserve - minfo_h, inv_max);
             inv_h = max(inv_h, inv_min);
-            const int mlist_h = avail - inv_h;
+            const int mlist_h = avail - minfo_h - inv_h;
+
             mlistp.y  += mheader;       // list starts below its title rule
             mlistsz.y  = mlist_h;
+            if (minfo_h > 0)
+            {
+                minfsz = coord_def(mlistsz.x, minfo_h);
+                minfp  = coord_def(mlistp.x, mlistp.y + mlist_h);
+            }
             invsz = coord_def(mlistsz.x, inv_h);
-            invp  = coord_def(mlistp.x, mlistp.y + mlist_h);
+            invp  = coord_def(mlistp.x, mlistp.y + mlist_h + minfo_h);
         }
     }
 #endif

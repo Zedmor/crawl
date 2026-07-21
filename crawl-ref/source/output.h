@@ -30,6 +30,7 @@ void redraw_screen(bool show_updates = true);
 string mpr_monster_list(bool past = false);
 int update_monster_pane();
 int update_inventory_pane();
+int update_monster_info_pane();
 
 int equip_slot_by_name(const char *s);
 

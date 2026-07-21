@@ -62,6 +62,8 @@ public:
     coord_def mlistsz;             // Size of the monster list.
     coord_def invp;                // Left-top pos of the inventory panel.
     coord_def invsz;               // Size of the inventory panel.
+    coord_def minfp;               // Left-top pos of the monster info panel.
+    coord_def minfsz;              // Size of the monster info panel.
 
     coord_def vgrdc;               // What grid pos is at the centre of the view
                                    // usually you.pos().
