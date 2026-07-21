@@ -396,6 +396,7 @@ enum GotoRegion
     GOTO_MINF, // cprintf > monster info panel
     GOTO_ABIL, // cprintf > abilities panel
     GOTO_SKILL,// cprintf > skills panel
+    GOTO_SPELL,// cprintf > spells panel
 };
 
 // Mouse modes (for tiles)

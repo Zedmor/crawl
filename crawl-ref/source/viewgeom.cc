@@ -434,6 +434,8 @@ void crawl_view_geometry::init_geometry()
     abilsz  = coord_def(0, 0);
     skillp  = coord_def(0, 0);
     skillsz = coord_def(0, 0);
+    spellp  = coord_def(0, 0);
+    spellsz = coord_def(0, 0);
 #ifndef USE_TILE_LOCAL
     // Only the default (inline) layout stacks the monster list directly below
     // the HUD, which is the space these sidebar panels are carved from. When
@@ -461,29 +463,39 @@ void crawl_view_geometry::init_geometry()
             const int right_w = sidebar_w - left_w - gutter;
             const int top     = hudp.y;
             const int right_h = msgp.y - top;   // full sidebar height
-            const bool wa = Options.show_abilities_panel;
-            const bool ws = Options.show_skills_panel;
-            int abil_h = 0, skill_h = 0;
-            if (wa && ws && right_h >= 8)
+            // Stack the enabled right-column panels (Abilities, then Skills,
+            // then Spells) and split the height between them; the last one
+            // gets the remainder so the column reaches the message pane.
+            const bool wa  = Options.show_abilities_panel;
+            const bool ws  = Options.show_skills_panel;
+            const bool wsp = Options.show_spells_panel;
+            int n = (wa ? 1 : 0) + (ws ? 1 : 0) + (wsp ? 1 : 0);
+            if (n > 0 && right_h >= 2)
             {
-                abil_h  = right_h / 2;
-                skill_h = right_h - abil_h;
-            }
-            else if (wa && right_h >= 2)
-                abil_h = right_h;
-            else if (ws && right_h >= 2)
-                skill_h = right_h;
-            int ry = top;
-            if (abil_h > 0)
-            {
-                abilp  = coord_def(right_x, ry);
-                abilsz = coord_def(right_w, abil_h);
-                ry += abil_h;
-            }
-            if (skill_h > 0)
-            {
-                skillp  = coord_def(right_x, ry);
-                skillsz = coord_def(right_w, skill_h);
+                const int each = right_h / n;
+                int ry = top;
+                int remaining = n;
+                if (wa)
+                {
+                    const int h = (remaining == 1) ? (msgp.y - ry) : each;
+                    abilp = coord_def(right_x, ry);
+                    abilsz = coord_def(right_w, h);
+                    ry += h; --remaining;
+                }
+                if (ws)
+                {
+                    const int h = (remaining == 1) ? (msgp.y - ry) : each;
+                    skillp = coord_def(right_x, ry);
+                    skillsz = coord_def(right_w, h);
+                    ry += h; --remaining;
+                }
+                if (wsp)
+                {
+                    const int h = (remaining == 1) ? (msgp.y - ry) : each;
+                    spellp = coord_def(right_x, ry);
+                    spellsz = coord_def(right_w, h);
+                    ry += h; --remaining;
+                }
             }
 
             // Left column below the HUD, narrowed to the stats width.
@@ -518,19 +530,22 @@ void crawl_view_geometry::init_geometry()
             // Narrow: a single stacked column, panels added in priority order.
             const int abil_want  = 8;
             const int skill_want = 8;
+            const int spell_want = 8;
             const int avail = mlistsz.y - mheader;
             if (avail >= mlist_reserve + inv_min)
             {
                 int budget = avail - mlist_reserve - inv_min;
-                int minfo_h = 0, abil_h = 0, skill_h = 0;
+                int minfo_h = 0, abil_h = 0, skill_h = 0, spell_h = 0;
                 if (Options.show_monster_info_panel && budget >= minfo_want)
                     { minfo_h = minfo_want; budget -= minfo_want; }
                 if (Options.show_abilities_panel && budget >= abil_want)
                     { abil_h = abil_want; budget -= abil_want; }
                 if (Options.show_skills_panel && budget >= skill_want)
                     { skill_h = skill_want; budget -= skill_want; }
+                if (Options.show_spells_panel && budget >= spell_want)
+                    { spell_h = spell_want; budget -= spell_want; }
 
-                const int optional = minfo_h + abil_h + skill_h;
+                const int optional = minfo_h + abil_h + skill_h + spell_h;
                 int inv_h = min(avail - mlist_reserve - optional, inv_max);
                 inv_h = max(inv_h, inv_min);
                 const int mlist_h = avail - optional - inv_h;
@@ -544,6 +559,8 @@ void crawl_view_geometry::init_geometry()
                     { abilp = coord_def(mlistp.x, y); abilsz = coord_def(mlistsz.x, abil_h); y += abil_h; }
                 if (skill_h > 0)
                     { skillp = coord_def(mlistp.x, y); skillsz = coord_def(mlistsz.x, skill_h); y += skill_h; }
+                if (spell_h > 0)
+                    { spellp = coord_def(mlistp.x, y); spellsz = coord_def(mlistsz.x, spell_h); y += spell_h; }
                 invp  = coord_def(mlistp.x, y);
                 invsz = coord_def(mlistsz.x, inv_h);
             }

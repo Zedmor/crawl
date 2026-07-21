@@ -478,6 +478,7 @@ public:
     bool        show_monster_info_panel;
     bool        show_abilities_panel;
     bool        show_skills_panel;
+    bool        show_spells_panel;
     bool        monster_item_view_coordinates;
     vector<text_pattern> monster_item_view_features;
     bool        messages_at_top;

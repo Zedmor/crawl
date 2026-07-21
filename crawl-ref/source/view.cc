@@ -700,6 +700,7 @@ void viewwindow(bool show_updates, bool tiles_only, animation *a, view_renderer 
                 update_monster_info_pane();
                 update_abilities_pane();
                 update_skills_pane();
+                update_spells_pane();
                 update_inventory_pane();
                 draw_sidebar_frame();
             }

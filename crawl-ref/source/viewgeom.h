@@ -68,6 +68,8 @@ public:
     coord_def abilsz;              // Size of the abilities panel.
     coord_def skillp;              // Left-top pos of the skills panel.
     coord_def skillsz;             // Size of the skills panel.
+    coord_def spellp;              // Left-top pos of the spells panel.
+    coord_def spellsz;             // Size of the spells panel.
 
     coord_def vgrdc;               // What grid pos is at the centre of the view
                                    // usually you.pos().

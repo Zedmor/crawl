@@ -21,6 +21,8 @@
 #include "describe.h"
 #include "mon-util.h"
 #include "skills.h"
+#include "spl-cast.h"
+#include "spl-util.h"
 #ifndef USE_TILE_LOCAL
 #endif
 #include "english.h"
@@ -2576,9 +2578,79 @@ int update_skills_pane()
     textcolour(LIGHTGREY);
     return lines.size();
 }
+// Always-on spells panel: memorised spells with fail rate and level. The header
+// shows the spell-level budget (available/total) — the same numbers as the '%'
+// overview screen's "Spells: N/M levels left".
+int update_spells_pane()
+{
+    if (crawl_view.spellsz.y <= 0 || crawl_view.spellsz.x <= 0)
+        return -1;
+    if (!map_bounds(you.pos()) && !crawl_state.game_is_arena())
+        return -1;
+
+    const int width  = crawl_view.spellsz.x;
+    const int height = crawl_view.spellsz.y;
+    save_cursor_pos save;
+    textbackground(BLACK);
+    const string blank(width, ' ');
+
+    CGOTOXY(1, 1, GOTO_SPELL);
+    textcolour(BLUE);
+    {
+        string label = make_stringf("─ Spells (%d/%d) ",
+                                     player_spell_levels(),
+                                     player_total_spell_levels());
+        while (strwidth(label) < width)
+            label += "─";
+        CPRINTF("%s", chop_string(label, width).c_str());
+    }
+
+    struct dline { int colour; string text; };
+    vector<dline> lines;
+    for (const spell_type spell : you.spells)
+    {
+        if (spell == SPELL_NO_SPELL)
+            continue;
+        const int letter = get_spell_letter(spell);
+        const int fail = failure_rate_to_int(raw_spell_fail(spell));
+        lines.push_back({LIGHTGREY,
+            make_stringf("%c) %-16.16s %2d%% L%d",
+                         letter > 0 ? (char) letter : '-',
+                         spell_title(spell), fail, spell_difficulty(spell))});
+    }
+    if (lines.empty())
+        lines.push_back({DARKGREY, "No spells known."});
+
+    const int body_lines = height - 1;
+    const bool overflow = (int) lines.size() > body_lines;
+    const int shown = overflow ? body_lines - 1 : (int) lines.size();
+    for (int i = 0; i < body_lines; ++i)
+    {
+        CGOTOXY(1, 2 + i, GOTO_SPELL);
+        if (i < shown)
+        {
+            textcolour(lines[i].colour);
+            CPRINTF("%s", chop_string(lines[i].text, width).c_str());
+        }
+        else if (overflow && i == body_lines - 1)
+        {
+            textcolour(BROWN);
+            CPRINTF("%s", chop_string(make_stringf("(… %d more)",
+                          (int) lines.size() - shown), width).c_str());
+        }
+        else
+        {
+            textcolour(LIGHTGREY);
+            CPRINTF("%s", blank.c_str());
+        }
+    }
+    textcolour(LIGHTGREY);
+    return lines.size();
+}
 #else
 int update_abilities_pane() { return false; }
 int update_skills_pane()    { return false; }
+int update_spells_pane()    { return false; }
 #endif
 
 int equip_slot_by_name(const char *s)

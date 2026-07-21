@@ -505,6 +505,7 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(SIMPLE_NAME(show_monster_info_panel), true),
         new BoolGameOption(SIMPLE_NAME(show_abilities_panel), true),
         new BoolGameOption(SIMPLE_NAME(show_skills_panel), true),
+        new BoolGameOption(SIMPLE_NAME(show_spells_panel), true),
         new BoolGameOption(SIMPLE_NAME(monster_item_view_coordinates), false),
         new ListGameOption<text_pattern>(SIMPLE_NAME(monster_item_view_features), {}, true),
         new BoolGameOption(SIMPLE_NAME(messages_at_top), false),
