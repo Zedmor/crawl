@@ -2517,21 +2517,38 @@ int update_skills_pane()
 
     struct dline { int colour; string text; };
     vector<dline> lines;
+
+    // Split into skills currently being trained and the rest the player has.
+    struct srow { skill_type sk; int lvl; unsigned int pct; };
+    vector<srow> trained, others;
     for (int i = 0; i < NUM_SKILLS; ++i)
     {
         const skill_type sk = static_cast<skill_type>(i);
         if (is_useless_skill(sk))
             continue;
-        // Only skills currently receiving XP (training percentage > 0).
-        if (you.training[sk] <= 0)
-            continue;
         const int lvl = you.skill(sk, 10);   // level * 10
-        lines.push_back({LIGHTGREEN,
-                         make_stringf("%-12.12s %2d.%d %2u%%", skill_name(sk),
-                                      lvl / 10, lvl % 10, you.training[sk])});
+        const unsigned int pct = you.training[sk];
+        if (pct > 0)
+            trained.push_back({sk, lvl, pct});
+        else if (lvl > 0)
+            others.push_back({sk, lvl, pct});
     }
+    // Trained skills on top, highest training % first; then the rest, by level.
+    sort(trained.begin(), trained.end(),
+         [](const srow &a, const srow &b) { return a.pct > b.pct; });
+    sort(others.begin(), others.end(),
+         [](const srow &a, const srow &b) { return a.lvl > b.lvl; });
+
+    for (const srow &r : trained)
+        lines.push_back({LIGHTGREEN,
+                         make_stringf("%-12.12s %2d.%d %2u%%", skill_name(r.sk),
+                                      r.lvl / 10, r.lvl % 10, r.pct)});
+    for (const srow &r : others)
+        lines.push_back({LIGHTGREY,
+                         make_stringf("%-12.12s %2d.%d", skill_name(r.sk),
+                                      r.lvl / 10, r.lvl % 10)});
     if (lines.empty())
-        lines.push_back({DARKGREY, "No skills training."});
+        lines.push_back({DARKGREY, "No skills trained."});
 
     const int body_lines = height - 1;
     const bool overflow = (int) lines.size() > body_lines;
