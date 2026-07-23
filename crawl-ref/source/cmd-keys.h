@@ -122,7 +122,12 @@
 #endif
 #ifdef WIZARD
 {'&', CMD_WIZARD},
-{'+', CMD_EXPLORE_MODE},
+// Fork: '+' (and keypad +) autoexplores like 'o', rather than offering the
+// irreversible score-disabling Explore Mode (still reachable via -explore or a
+// custom bindkey).
+{'+', CMD_EXPLORE},
+{CK_NUMPAD_ADD, CMD_EXPLORE},
+{CK_NUMPAD_ADD2, CMD_EXPLORE},
 #endif
 {'"', CMD_LIST_JEWELLERY},
 {'{', CMD_INSCRIBE_ITEM},
